@@ -1,0 +1,112 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  Moses v3.0 — Pre-commit Hooks
+# ═══════════════════════════════════════════════════════════════════════════
+# Install:   pre-commit install
+# Run all:   pre-commit run --all-files
+# Update:    pre-commit autoupdate
+#
+# Hooks run automatically on every git commit. If any hook fails,
+# the commit is blocked until the issue is fixed.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Minimum pre-commit framework version
+minimum_pre_commit_version: "3.7.0"
+
+# Default settings for all hooks
+default_language_version:
+  python: python3.10
+default_stages: [pre-commit, pre-push]
+
+repos:
+  # ─────────────────────────────────────────────────────────────────────────
+  #  General file hygiene
+  # ─────────────────────────────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      # Trim trailing whitespace from all files
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+
+      # Ensure files end with a single newline
+      - id: end-of-file-fixer
+
+      # Validate YAML syntax
+      - id: check-yaml
+
+      # Validate TOML syntax
+      - id: check-toml
+
+      # Prevent committing to main/master directly
+      - id: no-commit-to-branch
+        args: [--branch=main, --branch=master]
+
+      # Prevent large files from being committed
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+
+      # Check for merge conflict markers
+      - id: check-merge-conflict
+
+      # Ensure executable files have shebang lines
+      - id: check-executables-have-shebangs
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  Python formatting — Black
+  # ─────────────────────────────────────────────────────────────────────────
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black
+        language_version: python3.10
+        args: [--line-length=100]
+        files: \.(py|pyi)$
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  Python linting — Ruff
+  # ─────────────────────────────────────────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.7
+    hooks:
+      # Run the linter
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        files: \.(py|pyi)$
+
+      # Run the import sorter (isort replacement)
+      - id: ruff-format
+        files: \.(py|pyi)$
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  Static type checking — MyPy
+  # ─────────────────────────────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - types-pyyaml>=6.0.1
+          - types-tqdm>=4.66.0
+          - pydantic>=2.5.0
+        args: [--ignore-missing-imports, --show-error-codes]
+        files: ^src/
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  Quick unit tests — Pytest (fast subset only)
+  # ─────────────────────────────────────────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: pytest-quick
+        name: pytest-quick
+        entry: pytest
+        language: system
+        types: [python]
+        pass_filenames: false
+        always_run: false
+        stages: [pre-push]
+        args:
+          - tests/
+          - -m
+          - "not slow and not gpu and not isaac"
+          - --tb=short
+          - -q

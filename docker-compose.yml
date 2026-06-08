@@ -1,0 +1,107 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  Moses v3.0 — Docker Compose Stack
+# ═══════════════════════════════════════════════════════════════════════════
+# Services:
+#   • train      — GPU training container (Isaac Lab)
+#   • monitor    — Grafana dashboard for real-time metrics
+#   • tensorboard — TensorBoard for experiment logging
+#
+# Usage:
+#   docker compose up -d          # Start all services
+#   docker compose up train -d    # Start only training
+#   docker compose logs -f train  # Tail training logs
+#   docker compose down           # Stop all services
+# ═══════════════════════════════════════════════════════════════════════════
+
+version: "3.9"
+
+services:
+  # ─────────────────────────────────────────────────────────────────────────
+  #  Training Service (GPU)
+  # ─────────────────────────────────────────────────────────────────────────
+  train:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: moses:latest
+    container_name: moses-train
+    runtime: nvidia                    # NVIDIA Container Toolkit
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+      - HYDRA_FULL_ERROR=1
+      - WANDB_MODE=offline            # Change to "online" for live syncing
+    volumes:
+      # Shared directories (host:container)
+      - ./checkpoints:/app/checkpoints
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./configs:/app/configs:ro
+    command: >
+      python -m moses.train
+      config=default
+      output_dir=/app/checkpoints
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - moses-net
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  Monitoring Dashboard (Grafana)
+  # ─────────────────────────────────────────────────────────────────────────
+  monitor:
+    image: grafana/grafana:10.4.2
+    container_name: moses-monitor
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - moses-net
+    restart: unless-stopped
+    profiles:
+      - monitoring            # Only start when explicitly requested:
+                              #   docker compose --profile monitoring up -d
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  TensorBoard (Experiment Logging)
+  # ─────────────────────────────────────────────────────────────────────────
+  tensorboard:
+    image: tensorflow/tensorflow:2.16.1
+    container_name: moses-tensorboard
+    ports:
+      - "6006:6006"
+    volumes:
+      - ./logs:/logs:ro
+    command: >
+      tensorboard
+      --logdir=/logs
+      --host=0.0.0.0
+      --port=6006
+    networks:
+      - moses-net
+    restart: unless-stopped
+
+# ── Networks ──────────────────────────────────────────────────────────────
+networks:
+  moses-net:
+    driver: bridge
+
+# ── Volumes ───────────────────────────────────────────────────────────────
+volumes:
+  grafana-storage:
+    driver: local
