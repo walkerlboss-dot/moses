@@ -1,0 +1,113 @@
+# train_ppo.yaml — Moses Humanoid PPO Training Config
+# Optimized for DGX Spark (NVIDIA Blackwell, 128GB unified memory)
+
+# Experiment
+experiment_name: "moses_humanoid_ppo_v1"
+seed: 42
+device: "cuda"
+headless: true
+
+# Environment
+env:
+  name: "MosesHumanoid-v1"
+  num_envs: 4096
+  env_spacing: 4.0
+  episode_length_s: 20.0
+  
+  # Domain randomization
+  randomize:
+    gravity: [9.0, 10.0]  # m/s^2
+    mass_scale: [0.9, 1.1]
+    friction: [0.5, 1.2]
+    restitution: [0.0, 0.5]
+    joint_stiffness: [0.8, 1.2]
+    joint_damping: [0.8, 1.2]
+    
+  # Observations
+  observations:
+    - joint_pos
+    - joint_vel
+    - base_lin_vel
+    - base_ang_vel
+    - projected_gravity
+    - commands
+    - actions
+    - phase
+    
+  # Commands
+  commands:
+    resampling_time: 10.0
+    ranges:
+      lin_vel_x: [-1.0, 1.0]
+      lin_vel_y: [-0.5, 0.5]
+      ang_vel_yaw: [-1.0, 1.0]
+      heading: [-3.14, 3.14]
+
+# Policy Network
+policy:
+  class_name: "ActorCritic"
+  init_noise_std: 1.0
+  
+  actor_hidden_dims: [512, 256, 128]
+  critic_hidden_dims: [512, 256, 128]
+  activation: "elu"
+  
+  # RNN (optional)
+  rnn_type: "gru"
+  rnn_hidden_dim: 256
+  rnn_num_layers: 1
+
+# Algorithm (PPO)
+algorithm:
+  class_name: "PPO"
+  value_loss_coef: 1.0
+  use_clipped_value_loss: true
+  clip_param: 0.2
+  entropy_coef: 0.01
+  num_learning_epochs: 5
+  num_mini_batches: 4
+  learning_rate: 3.0e-4
+  schedule: "adaptive"
+  desired_kl: 0.01
+  gamma: 0.99
+  lam: 0.95
+  max_grad_norm: 1.0
+
+# Runner
+runner:
+  class_name: "OnPolicyRunner"
+  num_steps_per_env: 24
+  max_iterations: 5000
+  save_interval: 50
+  log_interval: 10
+  
+  # Checkpointing
+  resume: false
+  load_run: ""
+  checkpoint: -1
+
+# Logging
+logger:
+  backend: "wandb"  # or "tensorboard"
+  project: "moses-humanoid"
+  group: "ppo_baseline"
+  tags: ["dgx_spark", "humanoid", "ppo"]
+  
+# Distributed Training
+distributed:
+  backend: "nccl"
+  world_size: 1  # Set by launcher
+  rank: 0
+  local_rank: 0
+
+# Checkpointing
+checkpoint:
+  save_dir: "./checkpoints"
+  interval: 50  # iterations
+  max_to_keep: 10
+  
+# Performance
+performance:
+  mixed_precision: true
+  compile: true  # torch.compile
+  cuda_graphs: false  # Enable for speed if stable
