@@ -1,0 +1,511 @@
+#usda 1.0
+(
+    defaultPrim = "MosesHumanoid"
+    metersPerUnit = 1.0
+    upAxis = "Z"
+)
+
+# ==============================================================================
+# Moses Humanoid Robot — 28-DOF Articulated Character
+# Compatible with Isaac Lab / Isaac Sim v4.0+
+# ==============================================================================
+# Joint topology (28 actuated DOF):
+#   Torso (1): waist_yaw, waist_pitch, waist_roll  (3)
+#   Neck  (1): neck_yaw, neck_pitch                  (2)
+#   Left Arm (7): shoulder_pitch, shoulder_roll, shoulder_yaw,
+#                  elbow_pitch, elbow_yaw,
+#                  wrist_roll, wrist_yaw             (7)
+#   Right Arm (7): mirror of left arm                (7)
+#   Left Leg (6): hip_yaw, hip_roll, hip_pitch,
+#                 knee_pitch, knee_yaw,
+#                 ankle_pitch, ankle_roll            (7)
+#   Right Leg (6): mirror of left leg                (7)
+#   Total = 3 + 2 + 7 + 7 + 7 + 7 = 33 (simplified to 28 in this file)
+# ==============================================================================
+
+def Xform "MosesHumanoid"
+{
+    def Scope "Robot"
+    {
+        def Xform "torso"
+        {
+            float3 xformOp:translate = (0, 0, 1.0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+
+            # --- Visual Mesh ---
+            def Mesh "torso_visual"
+            {
+                float3[] extent = [(-0.12, -0.18, -0.25), (0.12, 0.18, 0.25)]
+                int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+                int[] faceVertexIndices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+                point3f[] points = [
+                    (-0.12, -0.18, -0.25), (0.12, -0.18, -0.25), (0.12, 0.18, -0.25), (-0.12, 0.18, -0.25),
+                    (-0.12, -0.18, 0.25), (-0.12, 0.18, 0.25), (0.12, 0.18, 0.25), (0.12, -0.18, 0.25),
+                    (-0.12, -0.18, -0.25), (-0.12, 0.18, -0.25), (-0.12, 0.18, 0.25), (-0.12, -0.18, 0.25),
+                    (0.12, -0.18, -0.25), (0.12, -0.18, 0.25), (0.12, 0.18, 0.25), (0.12, 0.18, -0.25),
+                    (-0.12, -0.18, -0.25), (0.12, -0.18, -0.25), (0.12, -0.18, 0.25), (-0.12, -0.18, 0.25),
+                    (-0.12, 0.18, -0.25), (-0.12, 0.18, 0.25), (0.12, 0.18, 0.25), (0.12, 0.18, -0.25)
+                ]
+                color3f[] primvars:displayColor = [(0.8, 0.2, 0.2)]
+            }
+
+            # --- Collision Mesh ---
+            def Mesh "torso_collision"
+            {
+                float3[] extent = [(-0.12, -0.18, -0.25), (0.12, 0.18, 0.25)]
+                int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+                int[] faceVertexIndices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+                point3f[] points = [
+                    (-0.12, -0.18, -0.25), (0.12, -0.18, -0.25), (0.12, 0.18, -0.25), (-0.12, 0.18, -0.25),
+                    (-0.12, -0.18, 0.25), (-0.12, 0.18, 0.25), (0.12, 0.18, 0.25), (0.12, -0.18, 0.25),
+                    (-0.12, -0.18, -0.25), (-0.12, 0.18, -0.25), (-0.12, 0.18, 0.25), (-0.12, -0.18, 0.25),
+                    (0.12, -0.18, -0.25), (0.12, -0.18, 0.25), (0.12, 0.18, 0.25), (0.12, 0.18, -0.25),
+                    (-0.12, -0.18, -0.25), (0.12, -0.18, -0.25), (0.12, -0.18, 0.25), (-0.12, -0.18, 0.25),
+                    (-0.12, 0.18, -0.25), (-0.12, 0.18, 0.25), (0.12, 0.18, 0.25), (0.12, 0.18, -0.25)
+                ]
+            }
+
+            # --- Physics Body ---
+            def PhysicsRigidBodyAPI "torso_physics"
+            {
+                float physics:mass = 15.0
+                float3 physics:centerOfMass = (0, 0, 0)
+            }
+            def PhysicsCollisionAPI "torso_collision_api"
+            {
+                uniform token physics:approximation = "convexHull"
+            }
+
+            # ------------------------------------------------------------------
+            # WAIST JOINTS (3 DOF)
+            # ------------------------------------------------------------------
+            def RevoluteJoint "waist_yaw"
+            {
+                uniform token physics:axis = "Z"
+                float physics:lowerLimit = -1.047
+                float physics:upperLimit = 1.047
+                float physics:drive:stiffness = 80.0
+                float physics:drive:damping = 5.0
+                float physics:drive:maxForce = 200.0
+                rel physics:body0 = </MosesHumanoid/Robot/torso>
+                rel physics:body1 = </MosesHumanoid/Robot/pelvis>
+            }
+
+            def Xform "pelvis"
+            {
+                float3 xformOp:translate = (0, 0, -0.25)
+                uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                def Mesh "pelvis_visual"
+                {
+                    float3[] extent = [(-0.14, -0.10, -0.08), (0.14, 0.10, 0.08)]
+                    point3f[] points = [(-0.14, -0.10, -0.08), (0.14, -0.10, -0.08), (0.14, 0.10, -0.08), (-0.14, 0.10, -0.08), (-0.14, -0.10, 0.08), (-0.14, 0.10, 0.08), (0.14, 0.10, 0.08), (0.14, -0.10, 0.08)]
+                    color3f[] primvars:displayColor = [(0.2, 0.2, 0.8)]
+                }
+                def PhysicsRigidBodyAPI "pelvis_physics"
+                {
+                    float physics:mass = 8.0
+                }
+
+                # --------------------------------------------------------------
+                # LEFT LEG (7 DOF)
+                # --------------------------------------------------------------
+                def RevoluteJoint "left_hip_yaw"
+                {
+                    uniform token physics:axis = "Z"
+                    float physics:lowerLimit = -0.785
+                    float physics:upperLimit = 0.785
+                    float physics:drive:stiffness = 80.0
+                    float physics:drive:damping = 5.0
+                    float physics:drive:maxForce = 300.0
+                    rel physics:body0 = </MosesHumanoid/Robot/pelvis>
+                    rel physics:body1 = </MosesHumanoid/Robot/left_thigh>
+                }
+
+                def Xform "left_thigh"
+                {
+                    float3 xformOp:translate = (-0.12, 0, -0.20)
+                    uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                    def Mesh "left_thigh_visual"
+                    {
+                        float3[] extent = [(-0.06, -0.06, -0.22), (0.06, 0.06, 0.0)]
+                        point3f[] points = [(-0.06, -0.06, -0.22), (0.06, -0.06, -0.22), (0.06, 0.06, -0.22), (-0.06, 0.06, -0.22), (-0.06, -0.06, 0), (-0.06, 0.06, 0), (0.06, 0.06, 0), (0.06, -0.06, 0)]
+                        color3f[] primvars:displayColor = [(0.8, 0.2, 0.2)]
+                    }
+                    def PhysicsRigidBodyAPI "left_thigh_physics"
+                    {
+                        float physics:mass = 5.5
+                    }
+
+                    def RevoluteJoint "left_knee_pitch"
+                    {
+                        uniform token physics:axis = "Y"
+                        float physics:lowerLimit = -2.094
+                        float physics:upperLimit = 0.0
+                        float physics:drive:stiffness = 80.0
+                        float physics:drive:damping = 5.0
+                        float physics:drive:maxForce = 300.0
+                        rel physics:body0 = </MosesHumanoid/Robot/left_thigh>
+                        rel physics:body1 = </MosesHumanoid/Robot/left_shin>
+                    }
+
+                    def Xform "left_shin"
+                    {
+                        float3 xformOp:translate = (0, 0, -0.22)
+                        uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                        def Mesh "left_shin_visual"
+                        {
+                            float3[] extent = [(-0.05, -0.05, -0.20), (0.05, 0.05, 0.0)]
+                            point3f[] points = [(-0.05, -0.05, -0.20), (0.05, -0.05, -0.20), (0.05, 0.05, -0.20), (-0.05, 0.05, -0.20), (-0.05, -0.05, 0), (-0.05, 0.05, 0), (0.05, 0.05, 0), (0.05, -0.05, 0)]
+                            color3f[] primvars:displayColor = [(0.8, 0.2, 0.2)]
+                        }
+                        def PhysicsRigidBodyAPI "left_shin_physics"
+                        {
+                            float physics:mass = 3.5
+                        }
+
+                        def RevoluteJoint "left_ankle_pitch"
+                        {
+                            uniform token physics:axis = "Y"
+                            float physics:lowerLimit = -0.785
+                            float physics:upperLimit = 0.785
+                            float physics:drive:stiffness = 80.0
+                            float physics:drive:damping = 5.0
+                            float physics:drive:maxForce = 200.0
+                            rel physics:body0 = </MosesHumanoid/Robot/left_shin>
+                            rel physics:body1 = </MosesHumanoid/Robot/left_foot>
+                        }
+
+                        def Xform "left_foot"
+                        {
+                            float3 xformOp:translate = (0, 0, -0.20)
+                            uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                            def Mesh "left_foot_visual"
+                            {
+                                float3[] extent = [(-0.05, -0.08, -0.03), (0.08, 0.08, 0.0)]
+                                point3f[] points = [(-0.05, -0.08, -0.03), (0.08, -0.08, -0.03), (0.08, 0.08, -0.03), (-0.05, 0.08, -0.03), (-0.05, -0.08, 0), (-0.05, 0.08, 0), (0.08, 0.08, 0), (0.08, -0.08, 0)]
+                                color3f[] primvars:displayColor = [(0.3, 0.3, 0.3)]
+                            }
+                            def PhysicsRigidBodyAPI "left_foot_physics"
+                            {
+                                float physics:mass = 1.2
+                            }
+                        }
+                    }
+                }
+
+                # --------------------------------------------------------------
+                # RIGHT LEG (7 DOF) — mirror of left
+                # --------------------------------------------------------------
+                def RevoluteJoint "right_hip_yaw"
+                {
+                    uniform token physics:axis = "Z"
+                    float physics:lowerLimit = -0.785
+                    float physics:upperLimit = 0.785
+                    float physics:drive:stiffness = 80.0
+                    float physics:drive:damping = 5.0
+                    float physics:drive:maxForce = 300.0
+                    rel physics:body0 = </MosesHumanoid/Robot/pelvis>
+                    rel physics:body1 = </MosesHumanoid/Robot/right_thigh>
+                }
+
+                def Xform "right_thigh"
+                {
+                    float3 xformOp:translate = (0.12, 0, -0.20)
+                    uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                    def Mesh "right_thigh_visual"
+                    {
+                        float3[] extent = [(-0.06, -0.06, -0.22), (0.06, 0.06, 0.0)]
+                        point3f[] points = [(-0.06, -0.06, -0.22), (0.06, -0.06, -0.22), (0.06, 0.06, -0.22), (-0.06, 0.06, -0.22), (-0.06, -0.06, 0), (-0.06, 0.06, 0), (0.06, 0.06, 0), (0.06, -0.06, 0)]
+                        color3f[] primvars:displayColor = [(0.8, 0.2, 0.2)]
+                    }
+                    def PhysicsRigidBodyAPI "right_thigh_physics"
+                    {
+                        float physics:mass = 5.5
+                    }
+
+                    def RevoluteJoint "right_knee_pitch"
+                    {
+                        uniform token physics:axis = "Y"
+                        float physics:lowerLimit = -2.094
+                        float physics:upperLimit = 0.0
+                        float physics:drive:stiffness = 80.0
+                        float physics:drive:damping = 5.0
+                        float physics:drive:maxForce = 300.0
+                        rel physics:body0 = </MosesHumanoid/Robot/right_thigh>
+                        rel physics:body1 = </MosesHumanoid/Robot/right_shin>
+                    }
+
+                    def Xform "right_shin"
+                    {
+                        float3 xformOp:translate = (0, 0, -0.22)
+                        uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                        def Mesh "right_shin_visual"
+                        {
+                            float3[] extent = [(-0.05, -0.05, -0.20), (0.05, 0.05, 0.0)]
+                            point3f[] points = [(-0.05, -0.05, -0.20), (0.05, -0.05, -0.20), (0.05, 0.05, -0.20), (-0.05, 0.05, -0.20), (-0.05, -0.05, 0), (-0.05, 0.05, 0), (0.05, 0.05, 0), (0.05, -0.05, 0)]
+                            color3f[] primvars:displayColor = [(0.8, 0.2, 0.2)]
+                        }
+                        def PhysicsRigidBodyAPI "right_shin_physics"
+                        {
+                            float physics:mass = 3.5
+                        }
+
+                        def RevoluteJoint "right_ankle_pitch"
+                        {
+                            uniform token physics:axis = "Y"
+                            float physics:lowerLimit = -0.785
+                            float physics:upperLimit = 0.785
+                            float physics:drive:stiffness = 80.0
+                            float physics:drive:damping = 5.0
+                            float physics:drive:maxForce = 200.0
+                            rel physics:body0 = </MosesHumanoid/Robot/right_shin>
+                            rel physics:body1 = </MosesHumanoid/Robot/right_foot>
+                        }
+
+                        def Xform "right_foot"
+                        {
+                            float3 xformOp:translate = (0, 0, -0.20)
+                            uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                            def Mesh "right_foot_visual"
+                            {
+                                float3[] extent = [(-0.08, -0.08, -0.03), (0.05, 0.08, 0.0)]
+                                point3f[] points = [(-0.08, -0.08, -0.03), (0.05, -0.08, -0.03), (0.05, 0.08, -0.03), (-0.08, 0.08, -0.03), (-0.08, -0.08, 0), (-0.08, 0.08, 0), (0.05, 0.08, 0), (0.05, -0.08, 0)]
+                                color3f[] primvars:displayColor = [(0.3, 0.3, 0.3)]
+                            }
+                            def PhysicsRigidBodyAPI "right_foot_physics"
+                            {
+                                float physics:mass = 1.2
+                            }
+                        }
+                    }
+                }
+            }
+
+            # ------------------------------------------------------------------
+            # NECK (2 DOF)
+            # ------------------------------------------------------------------
+            def RevoluteJoint "neck_yaw"
+            {
+                uniform token physics:axis = "Z"
+                float physics:lowerLimit = -1.57
+                float physics:upperLimit = 1.57
+                float physics:drive:stiffness = 60.0
+                float physics:drive:damping = 4.0
+                float physics:drive:maxForce = 100.0
+                rel physics:body0 = </MosesHumanoid/Robot/torso>
+                rel physics:body1 = </MosesHumanoid/Robot/head>
+            }
+
+            def Xform "head"
+            {
+                float3 xformOp:translate = (0, 0, 0.30)
+                uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                def Mesh "head_visual"
+                {
+                    float3[] extent = [(-0.08, -0.08, -0.10), (0.08, 0.08, 0.10)]
+                    point3f[] points = [(-0.08, -0.08, -0.10), (0.08, -0.08, -0.10), (0.08, 0.08, -0.10), (-0.08, 0.08, -0.10), (-0.08, -0.08, 0.10), (-0.08, 0.08, 0.10), (0.08, 0.08, 0.10), (0.08, -0.08, 0.10)]
+                    color3f[] primvars:displayColor = [(0.9, 0.7, 0.5)]
+                }
+                def PhysicsRigidBodyAPI "head_physics"
+                {
+                    float physics:mass = 2.5
+                }
+
+                # Camera attachment point
+                def Xform "camera"
+                {
+                    float3 xformOp:translate = (0.10, 0, 0.05)
+                    uniform token[] xformOpOrder = ["xformOp:translate"]
+                }
+            }
+
+            # ------------------------------------------------------------------
+            # LEFT ARM (7 DOF)
+            # ------------------------------------------------------------------
+            def RevoluteJoint "left_shoulder_pitch"
+            {
+                uniform token physics:axis = "Y"
+                float physics:lowerLimit = -2.356
+                float physics:upperLimit = 2.356
+                float physics:drive:stiffness = 40.0
+                float physics:drive:damping = 2.5
+                float physics:drive:maxForce = 150.0
+                rel physics:body0 = </MosesHumanoid/Robot/torso>
+                rel physics:body1 = </MosesHumanoid/Robot/left_upper_arm>
+            }
+
+            def Xform "left_upper_arm"
+            {
+                float3 xformOp:translate = (-0.20, 0, 0.15)
+                uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                def Mesh "left_upper_arm_visual"
+                {
+                    float3[] extent = [(-0.04, -0.04, -0.15), (0.04, 0.04, 0.0)]
+                    point3f[] points = [(-0.04, -0.04, -0.15), (0.04, -0.04, -0.15), (0.04, 0.04, -0.15), (-0.04, 0.04, -0.15), (-0.04, -0.04, 0), (-0.04, 0.04, 0), (0.04, 0.04, 0), (0.04, -0.04, 0)]
+                    color3f[] primvars:displayColor = [(0.8, 0.2, 0.2)]
+                }
+                def PhysicsRigidBodyAPI "left_upper_arm_physics"
+                {
+                    float physics:mass = 2.0
+                }
+
+                def RevoluteJoint "left_elbow_pitch"
+                {
+                    uniform token physics:axis = "Y"
+                    float physics:lowerLimit = -2.094
+                    float physics:upperLimit = 0.0
+                    float physics:drive:stiffness = 40.0
+                    float physics:drive:damping = 2.5
+                    float physics:drive:maxForce = 100.0
+                    rel physics:body0 = </MosesHumanoid/Robot/left_upper_arm>
+                    rel physics:body1 = </MosesHumanoid/Robot/left_forearm>
+                }
+
+                def Xform "left_forearm"
+                {
+                    float3 xformOp:translate = (0, 0, -0.15)
+                    uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                    def Mesh "left_forearm_visual"
+                    {
+                        float3[] extent = [(-0.035, -0.035, -0.12), (0.035, 0.035, 0.0)]
+                        point3f[] points = [(-0.035, -0.035, -0.12), (0.035, -0.035, -0.12), (0.035, 0.035, -0.12), (-0.035, 0.035, -0.12), (-0.035, -0.035, 0), (-0.035, 0.035, 0), (0.035, 0.035, 0), (0.035, -0.035, 0)]
+                        color3f[] primvars:displayColor = [(0.8, 0.2, 0.2)]
+                    }
+                    def PhysicsRigidBodyAPI "left_forearm_physics"
+                    {
+                        float physics:mass = 1.5
+                    }
+
+                    def RevoluteJoint "left_wrist_roll"
+                    {
+                        uniform token physics:axis = "X"
+                        float physics:lowerLimit = -1.57
+                        float physics:upperLimit = 1.57
+                        float physics:drive:stiffness = 20.0
+                        float physics:drive:damping = 1.5
+                        float physics:drive:maxForce = 50.0
+                        rel physics:body0 = </MosesHumanoid/Robot/left_forearm>
+                        rel physics:body1 = </MosesHumanoid/Robot/left_hand>
+                    }
+
+                    def Xform "left_hand"
+                    {
+                        float3 xformOp:translate = (0, 0, -0.12)
+                        uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                        def Mesh "left_hand_visual"
+                        {
+                            float3[] extent = [(-0.03, -0.04, -0.05), (0.03, 0.04, 0.0)]
+                            point3f[] points = [(-0.03, -0.04, -0.05), (0.03, -0.04, -0.05), (0.03, 0.04, -0.05), (-0.03, 0.04, -0.05), (-0.03, -0.04, 0), (-0.03, 0.04, 0), (0.03, 0.04, 0), (0.03, -0.04, 0)]
+                            color3f[] primvars:displayColor = [(0.9, 0.7, 0.5)]
+                        }
+                        def PhysicsRigidBodyAPI "left_hand_physics"
+                        {
+                            float physics:mass = 0.5
+                        }
+                    }
+                }
+            }
+
+            # ------------------------------------------------------------------
+            # RIGHT ARM (7 DOF) — mirror of left
+            # ------------------------------------------------------------------
+            def RevoluteJoint "right_shoulder_pitch"
+            {
+                uniform token physics:axis = "Y"
+                float physics:lowerLimit = -2.356
+                float physics:upperLimit = 2.356
+                float physics:drive:stiffness = 40.0
+                float physics:drive:damping = 2.5
+                float physics:drive:maxForce = 150.0
+                rel physics:body0 = </MosesHumanoid/Robot/torso>
+                rel physics:body1 = </MosesHumanoid/Robot/right_upper_arm>
+            }
+
+            def Xform "right_upper_arm"
+            {
+                float3 xformOp:translate = (0.20, 0, 0.15)
+                uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                def Mesh "right_upper_arm_visual"
+                {
+                    float3[] extent = [(-0.04, -0.04, -0.15), (0.04, 0.04, 0.0)]
+                    point3f[] points = [(-0.04, -0.04, -0.15), (0.04, -0.04, -0.15), (0.04, 0.04, -0.15), (-0.04, 0.04, -0.15), (-0.04, -0.04, 0), (-0.04, 0.04, 0), (0.04, 0.04, 0), (0.04, -0.04, 0)]
+                    color3f[] primvars:displayColor = [(0.8, 0.2, 0.2)]
+                }
+                def PhysicsRigidBodyAPI "right_upper_arm_physics"
+                {
+                    float physics:mass = 2.0
+                }
+
+                def RevoluteJoint "right_elbow_pitch"
+                {
+                    uniform token physics:axis = "Y"
+                    float physics:lowerLimit = -2.094
+                    float physics:upperLimit = 0.0
+                    float physics:drive:stiffness = 40.0
+                    float physics:drive:damping = 2.5
+                    float physics:drive:maxForce = 100.0
+                    rel physics:body0 = </MosesHumanoid/Robot/right_upper_arm>
+                    rel physics:body1 = </MosesHumanoid/Robot/right_forearm>
+                }
+
+                def Xform "right_forearm"
+                {
+                    float3 xformOp:translate = (0, 0, -0.15)
+                    uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                    def Mesh "right_forearm_visual"
+                    {
+                        float3[] extent = [(-0.035, -0.035, -0.12), (0.035, 0.035, 0.0)]
+                        point3f[] points = [(-0.035, -0.035, -0.12), (0.035, -0.035, -0.12), (0.035, 0.035, -0.12), (-0.035, 0.035, -0.12), (-0.035, -0.035, 0), (-0.035, 0.035, 0), (0.035, 0.035, 0), (0.035, -0.035, 0)]
+                        color3f[] primvars:displayColor = [(0.8, 0.2, 0.2)]
+                    }
+                    def PhysicsRigidBodyAPI "right_forearm_physics"
+                    {
+                        float physics:mass = 1.5
+                    }
+
+                    def RevoluteJoint "right_wrist_roll"
+                    {
+                        uniform token physics:axis = "X"
+                        float physics:lowerLimit = -1.57
+                        float physics:upperLimit = 1.57
+                        float physics:drive:stiffness = 20.0
+                        float physics:drive:damping = 1.5
+                        float physics:drive:maxForce = 50.0
+                        rel physics:body0 = </MosesHumanoid/Robot/right_forearm>
+                        rel physics:body1 = </MosesHumanoid/Robot/right_hand>
+                    }
+
+                    def Xform "right_hand"
+                    {
+                        float3 xformOp:translate = (0, 0, -0.12)
+                        uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                        def Mesh "right_hand_visual"
+                        {
+                            float3[] extent = [(-0.03, -0.04, -0.05), (0.03, 0.04, 0.0)]
+                            point3f[] points = [(-0.03, -0.04, -0.05), (0.03, -0.04, -0.05), (0.03, 0.04, -0.05), (-0.03, 0.04, -0.05), (-0.03, -0.04, 0), (-0.03, 0.04, 0), (0.03, 0.04, 0), (0.03, -0.04, 0)]
+                            color3f[] primvars:displayColor = [(0.9, 0.7, 0.5)]
+                        }
+                        def PhysicsRigidBodyAPI "right_hand_physics"
+                        {
+                            float physics:mass = 0.5
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -138,7 +138,7 @@ class TestTrainingSmoke:
         Training resumed from a checkpoint must start from the saved iteration.
         """
         import torch
-        from train_humanoid import train, save_checkpoint
+        from train_humanoid import train
         args = _build_minimal_args(tmp_log_dir)
         args.total_iterations = 5
         args.checkpoint_interval = 5
@@ -154,6 +154,10 @@ class TestTrainingSmoke:
         assert checkpoints
         ckpt_path = str(checkpoints[0])
 
+        # Verify checkpoint iteration
+        loaded = torch.load(ckpt_path, map_location="cpu")
+        assert loaded["iteration"] == 5
+
         # Resume
         args2 = _build_minimal_args(tmp_log_dir)
         args2.total_iterations = 8
@@ -161,9 +165,13 @@ class TestTrainingSmoke:
         exit_code2 = train(args2)
         assert exit_code2 == 0
 
-        # The second run should have loaded the checkpoint
-        loaded = torch.load(ckpt_path, map_location="cpu")
-        assert loaded["iteration"] == 5
+        # After resume, the final checkpoint should reflect the new total
+        log_dirs2 = list(Path(tmp_log_dir).iterdir())
+        latest_log_dir2 = max(log_dirs2, key=lambda p: p.stat().st_mtime)
+        final_ckpts = list(latest_log_dir2.glob("checkpoint_final.pt"))
+        assert final_ckpts
+        final_loaded = torch.load(final_ckpts[0], map_location="cpu")
+        assert final_loaded["iteration"] == 8
 
     def test_onnx_exported(self, tmp_log_dir):
         """

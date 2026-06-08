@@ -225,21 +225,49 @@ class SevenDOFArm:
         """
         Compute forward kinematics for the end-effector pose.
 
-        Returns a 4x4 homogeneous transform matrix.
+        Uses a modified DH convention with alternating revolute axes
+        (z, y, z, y, z, y, z) and per-link offsets to produce a
+        non-degenerate 7-DOF serial chain. Returns a 4x4 homogeneous transform.
         """
         assert joint_angles.shape == (7,), f"Expected 7 joint angles, got {joint_angles.shape}"
         T = np.eye(4)
+        # Alternating axes: z, y, z, y, z, y, z
+        axes = [
+            np.array([0.0, 0.0, 1.0]),
+            np.array([0.0, 1.0, 0.0]),
+            np.array([0.0, 0.0, 1.0]),
+            np.array([0.0, 1.0, 0.0]),
+            np.array([0.0, 0.0, 1.0]),
+            np.array([0.0, 1.0, 0.0]),
+            np.array([0.0, 0.0, 1.0]),
+        ]
         for i in range(7):
             theta = joint_angles[i]
             a = self.link_lengths[i]
-            # Simplified DH: rotation about z, translation along x
-            ct, st = np.cos(theta), np.sin(theta)
-            Ti = np.array([
-                [ct, -st, 0.0, a * ct],
-                [st,  ct, 0.0, a * st],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
+            axis = axes[i]
+            # Rodrigues rotation about arbitrary axis
+            K = np.array([
+                [0.0, -axis[2], axis[1]],
+                [axis[2], 0.0, -axis[0]],
+                [-axis[1], axis[0], 0.0],
             ])
+            ct, st = np.cos(theta), np.sin(theta)
+            R = np.eye(3) + st * K + (1 - ct) * (K @ K)
+            # Translation along a direction that is NOT parallel to the rotation axis
+            # Use a fixed offset vector that changes per joint to guarantee full rank
+            offset_dirs = [
+                np.array([1.0, 0.0, 0.0]),
+                np.array([0.0, 0.0, 1.0]),
+                np.array([1.0, 0.0, 0.0]),
+                np.array([0.0, 0.0, 1.0]),
+                np.array([1.0, 0.0, 0.0]),
+                np.array([0.0, 0.0, 1.0]),
+                np.array([1.0, 0.0, 0.0]),
+            ]
+            t = R @ (offset_dirs[i] * a)
+            Ti = np.eye(4)
+            Ti[:3, :3] = R
+            Ti[:3, 3] = t
             T = T @ Ti
         return T
 
@@ -253,16 +281,16 @@ class SevenDOFArm:
             initial_guess = np.zeros(7)
         q = initial_guess.copy()
         target_pos = target_pose[:3, 3]
-        for _ in range(100):
+        for _ in range(200):
             T = self.fk(q)
             error = target_pos - T[:3, 3]
-            if np.linalg.norm(error) < 1e-4:
+            if np.linalg.norm(error) < 1e-5:
                 break
             J = self.jacobian(q)
             # Use only position part of Jacobian (3x7)
             J_pos = J[:3, :]
             dq = np.linalg.pinv(J_pos) @ error
-            q += dq * 0.5
+            q += dq * 0.3
             # Clamp to joint limits
             for i in range(7):
                 lo, hi = self.joint_limits[i]
@@ -278,28 +306,48 @@ class SevenDOFArm:
         assert joint_angles.shape == (7,)
         J = np.zeros((6, 7))
         T = np.eye(4)
-        # Forward pass: compute transforms
+        axes = [
+            np.array([0.0, 0.0, 1.0]),
+            np.array([0.0, 1.0, 0.0]),
+            np.array([0.0, 0.0, 1.0]),
+            np.array([0.0, 1.0, 0.0]),
+            np.array([0.0, 0.0, 1.0]),
+            np.array([0.0, 1.0, 0.0]),
+            np.array([0.0, 0.0, 1.0]),
+        ]
+        offset_dirs = [
+            np.array([1.0, 0.0, 0.0]),
+            np.array([0.0, 0.0, 1.0]),
+            np.array([1.0, 0.0, 0.0]),
+            np.array([0.0, 0.0, 1.0]),
+            np.array([1.0, 0.0, 0.0]),
+            np.array([0.0, 0.0, 1.0]),
+            np.array([1.0, 0.0, 0.0]),
+        ]
         transforms = [T.copy()]
         for i in range(7):
             theta = joint_angles[i]
             a = self.link_lengths[i]
-            ct, st = np.cos(theta), np.sin(theta)
-            Ti = np.array([
-                [ct, -st, 0.0, a * ct],
-                [st,  ct, 0.0, a * st],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
+            axis = axes[i]
+            K = np.array([
+                [0.0, -axis[2], axis[1]],
+                [axis[2], 0.0, -axis[0]],
+                [-axis[1], axis[0], 0.0],
             ])
+            ct, st = np.cos(theta), np.sin(theta)
+            R = np.eye(3) + st * K + (1 - ct) * (K @ K)
+            t = R @ (offset_dirs[i] * a)
+            Ti = np.eye(4)
+            Ti[:3, :3] = R
+            Ti[:3, 3] = t
             T = T @ Ti
             transforms.append(T.copy())
 
-        # End-effector position
         p_ee = transforms[-1][:3, 3]
-        z_axis = np.array([0.0, 0.0, 1.0])
 
         for i in range(7):
             p_i = transforms[i][:3, 3]
-            z_i = transforms[i][:3, :3] @ z_axis
+            z_i = transforms[i][:3, :3] @ axes[i]
             J[:3, i] = np.cross(z_i, p_ee - p_i)
             J[3:, i] = z_i
         return J
