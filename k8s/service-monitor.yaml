@@ -1,0 +1,39 @@
+---
+# Service to expose Prometheus metrics from training/evaluation pods
+apiVersion: v1
+kind: Service
+metadata:
+  name: moses-metrics
+  namespace: moses
+  labels:
+    app.kubernetes.io/name: moses
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: moses-dgx
+spec:
+  selector:
+    app.kubernetes.io/name: moses
+  ports:
+    - name: prometheus
+      protocol: TCP
+      port: 9090
+      targetPort: 9090
+  type: ClusterIP
+---
+# ServiceMonitor for Prometheus Operator (optional, if Prometheus Operator is installed)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: moses-metrics-monitor
+  namespace: moses
+  labels:
+    app.kubernetes.io/name: moses
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: moses
+  endpoints:
+    - port: prometheus
+      interval: 15s
+      path: /metrics
+      scrapeTimeout: 10s

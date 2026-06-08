@@ -1,0 +1,39 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: moses-training-config
+  namespace: moses
+  labels:
+    app.kubernetes.io/name: moses
+    app.kubernetes.io/component: config
+data:
+  # Mount this as train_ppo.yaml inside the container
+  train_ppo.yaml: |
+    # Moses v3.0 PPO Training Configuration
+    algorithm: PPO
+    env_id: Humanoid-v4
+    total_timesteps: 100000000
+    num_envs: 2048
+    batch_size: 32768
+    minibatch_size: 4096
+    update_epochs: 10
+    learning_rate: 3.0e-4
+    gamma: 0.99
+    gae_lambda: 0.95
+    clip_coef: 0.2
+    ent_coef: 0.0
+    vf_coef: 0.5
+    max_grad_norm: 0.5
+    seed: 42
+    # Logging
+    log_interval: 10
+    save_interval: 100
+    checkpoint_dir: /mnt/checkpoints
+    # W&B
+    wandb_project: moses-humanoid
+    wandb_entity: moses-team
+    # Distributed
+    backend: nccl
+    master_addr: localhost
+    master_port: "29500"

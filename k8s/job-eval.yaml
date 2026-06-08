@@ -1,0 +1,84 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: moses-eval-policy
+  namespace: moses
+  labels:
+    app.kubernetes.io/name: moses
+    app.kubernetes.io/component: evaluation
+    app.kubernetes.io/part-of: moses-dgx
+spec:
+  parallelism: 1
+  completions: 1
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: moses
+        app.kubernetes.io/component: evaluation
+        job-name: moses-eval-policy
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: moses-sa
+      nodeSelector:
+        accelerator: nvidia-dgx-spark  # <-- Substitute with your DGX node label
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: moses-eval
+          image: moses-dgx:latest
+          imagePullPolicy: Always
+          command:
+            - python
+            - eval_policy.py
+            - --checkpoint
+            - /mnt/checkpoints/latest.pt
+            - --output
+            - /mnt/checkpoints/eval_results.json
+            - --num-episodes
+            - "100"
+            - --render
+            - "false"
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: CUDA_VISIBLE_DEVICES
+              value: "0"
+            - name: NCCL_DEBUG
+              value: "WARN"
+            - name: WANDB_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: wandb-secret
+                  key: api-key
+            - name: WANDB_PROJECT
+              value: "moses-humanoid"
+            - name: WANDB_ENTITY
+              value: "moses-team"
+            - name: OMP_NUM_THREADS
+              value: "1"
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+              memory: "64Gi"
+              cpu: "16"
+            requests:
+              nvidia.com/gpu: "1"
+              memory: "32Gi"
+              cpu: "8"
+          volumeMounts:
+            - name: nfs-shared
+              mountPath: /mnt/checkpoints
+              subPath: checkpoints
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
+      volumes:
+        - name: nfs-shared
+          persistentVolumeClaim:
+            claimName: moses-nfs-shared

@@ -1,0 +1,105 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: moses-train-humanoid
+  namespace: moses
+  labels:
+    app.kubernetes.io/name: moses
+    app.kubernetes.io/component: training
+    app.kubernetes.io/part-of: moses-dgx
+spec:
+  parallelism: 1
+  completions: 1
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: moses
+        app.kubernetes.io/component: training
+        job-name: moses-train-humanoid
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: moses-sa
+      nodeSelector:
+        accelerator: nvidia-dgx-spark  # <-- Substitute with your DGX node label
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: moses-train
+          image: moses-dgx:latest
+          imagePullPolicy: Always
+          command:
+            - torchrun
+            - --nnodes=1
+            - --nproc_per_node=8
+            - --rdzv_id=moses-train
+            - --rdzv_backend=c10d
+            - --rdzv_endpoint=localhost:29500
+            - train_humanoid.py
+            - --config
+            - /workspace/moses/configs/train_ppo.yaml
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: CUDA_VISIBLE_DEVICES
+              value: "0,1,2,3,4,5,6,7"
+            - name: NCCL_DEBUG
+              value: "INFO"
+            - name: NCCL_IB_DISABLE
+              value: "0"
+            - name: NCCL_P2P_LEVEL
+              value: "NVL"
+            - name: NCCL_NET_GDR_LEVEL
+              value: "5"
+            - name: WANDB_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: wandb-secret
+                  key: api-key
+            - name: WANDB_PROJECT
+              value: "moses-humanoid"
+            - name: WANDB_ENTITY
+              value: "moses-team"
+            - name: OMP_NUM_THREADS
+              value: "1"
+            - name: MKL_NUM_THREADS
+              value: "1"
+          resources:
+            limits:
+              nvidia.com/gpu: "8"
+              memory: "512Gi"
+              cpu: "128"
+            requests:
+              nvidia.com/gpu: "8"
+              memory: "256Gi"
+              cpu: "64"
+          volumeMounts:
+            - name: training-config
+              mountPath: /workspace/moses/configs
+              readOnly: true
+            - name: nvme-scratch
+              mountPath: /mnt/scratch
+            - name: nfs-shared
+              mountPath: /mnt/datasets
+              subPath: datasets
+            - name: nfs-shared
+              mountPath: /mnt/checkpoints
+              subPath: checkpoints
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
+      volumes:
+        - name: training-config
+          configMap:
+            name: moses-training-config
+        - name: nvme-scratch
+          persistentVolumeClaim:
+            claimName: moses-nvme-scratch
+        - name: nfs-shared
+          persistentVolumeClaim:
+            claimName: moses-nfs-shared

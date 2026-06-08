@@ -1,0 +1,36 @@
+---
+# NVMe Scratch PVC — Fast, ephemeral local storage for checkpoints and temp data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: moses-nvme-scratch
+  namespace: moses
+  labels:
+    app.kubernetes.io/name: moses
+    app.kubernetes.io/component: storage
+    storage-type: nvme
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: nvme-local  # <-- Substitute with your cluster's NVMe storage class
+  resources:
+    requests:
+      storage: 2Ti
+---
+# NFS Shared PVC — Shared datasets and persistent checkpoints
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: moses-nfs-shared
+  namespace: moses
+  labels:
+    app.kubernetes.io/name: moses
+    app.kubernetes.io/component: storage
+    storage-type: nfs
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-client  # <-- Substitute with your cluster's NFS storage class
+  resources:
+    requests:
+      storage: 10Ti

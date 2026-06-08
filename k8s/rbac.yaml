@@ -1,0 +1,53 @@
+---
+# ServiceAccount for Moses workloads
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: moses-sa
+  namespace: moses
+  labels:
+    app.kubernetes.io/name: moses
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: moses-dgx
+automountServiceAccountToken: true
+---
+# Role: Allow Moses pods to read ConfigMaps and Secrets in the moses namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: moses-role
+  namespace: moses
+  labels:
+    app.kubernetes.io/name: moses
+    app.kubernetes.io/component: rbac
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch"]
+---
+# RoleBinding: Bind the Role to the ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: moses-rolebinding
+  namespace: moses
+  labels:
+    app.kubernetes.io/name: moses
+    app.kubernetes.io/component: rbac
+subjects:
+  - kind: ServiceAccount
+    name: moses-sa
+    namespace: moses
+roleRef:
+  kind: Role
+  name: moses-role
+  apiGroup: rbac.authorization.k8s.io
